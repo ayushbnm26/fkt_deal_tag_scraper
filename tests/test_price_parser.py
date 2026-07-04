@@ -5,6 +5,7 @@ from extractors.price_parser import (
     discount_matches_prices,
     format_discount,
     format_price,
+    infer_old_price_from_price_text,
     parse_discount_value,
     parse_price_value,
 )
@@ -54,3 +55,35 @@ def test_clean_price_block_blanks_invalid_old_price_and_bad_discount() -> None:
     )
     assert block["old_price"] == "1,399"
     assert block["discount_percentage"] == ""
+
+
+def test_infer_old_price_from_badge_price_line_without_rupee_on_mrp() -> None:
+    text = "Top Discount of the Sale 81% 3,499 \u20b9662 +\u20b926 Protect Promise Fee"
+
+    assert infer_old_price_from_price_text(text, "662", "81%") == "3,499"
+
+    block = clean_price_block(
+        {
+            "text": text,
+            "new_price": "\u20b9662",
+            "old_price": "",
+            "discount_percentage": "\u219381%",
+        }
+    )
+    assert block["old_price"] == "3,499"
+    assert block["new_price"] == "662"
+    assert block["discount_percentage"] == "81%"
+
+
+def test_clean_price_block_uses_nearby_text_to_recover_old_price() -> None:
+    block = clean_price_block(
+        {
+            "text": "Top Discount of the Sale \u20b9662",
+            "nearby_text": "Top Discount of the Sale 81% 3,499 \u20b9662 Buy at \u20b9628",
+            "new_price": "662",
+            "old_price": "",
+            "discount_percentage": "81%",
+        }
+    )
+
+    assert block["old_price"] == "3,499"

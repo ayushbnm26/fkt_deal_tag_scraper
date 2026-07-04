@@ -4,6 +4,13 @@ import re
 from typing import Any
 
 
+PRICE_SEQUENCE_RE = re.compile(
+    r"(?:\u2193\s*)?(\d{1,3})\s*%[^\u20b9\d]{0,12}(\d[\d,]*)[^\u20b9]{0,24}\u20b9\s*(\d[\d,]*)"
+)
+DISCOUNT_RE = re.compile(r"(?:\u2193\s*)?(\d{1,3})\s*%")
+NUMBER_TOKEN_RE = re.compile(r"(?:\u20b9\s*)?(\d[\d,]*)")
+
+
 def parse_price_value(text: str) -> int | None:
     if text is None:
         return None
@@ -58,17 +65,59 @@ def discount_matches_prices(old_price: str, new_price: str, discount: str, toler
     return abs(computed - discount_value) <= tolerance
 
 
+def infer_old_price_from_price_text(raw_text: str, new_price: str, discount: str) -> str:
+    new_value = parse_price_value(new_price)
+    discount_value = parse_discount_value(discount)
+    if new_value is None or discount_value is None:
+        return ""
+
+    text = str(raw_text or "").replace("\u00a0", " ")
+    for discount_match in DISCOUNT_RE.finditer(text):
+        if parse_discount_value(discount_match.group(0)) != discount_value:
+            continue
+
+        window_start = discount_match.start()
+        window = text[window_start : discount_match.end() + 140]
+        discount_end = discount_match.end() - window_start
+        tokens: list[tuple[int, int]] = []
+        for token in NUMBER_TOKEN_RE.finditer(window):
+            if token.start() < discount_end:
+                continue
+            value = parse_price_value(token.group(1))
+            if value is not None:
+                tokens.append((value, token.start()))
+
+        for index, (value, _position) in enumerate(tokens):
+            if value != new_value:
+                continue
+            previous_prices = [candidate for candidate, _ in tokens[:index] if candidate > new_value]
+            for candidate in reversed(previous_prices):
+                formatted = format_price(candidate)
+                if discount_matches_prices(formatted, format_price(new_value), format_discount(discount_value)):
+                    return formatted
+
+        for value, _position in tokens:
+            if value <= new_value:
+                continue
+            formatted = format_price(value)
+            if discount_matches_prices(formatted, format_price(new_value), format_discount(discount_value)):
+                return formatted
+
+    return ""
+
+
 def clean_price_block(raw: dict[str, Any] | None) -> dict[str, Any]:
     raw = raw or {}
     old_price = format_price(raw.get("old_price") or raw.get("oldPrice"))
     new_price = format_price(raw.get("new_price") or raw.get("newPrice"))
     discount = format_discount(raw.get("discount_percentage") or raw.get("discountPercentage"))
 
-    raw_text = str(raw.get("text") or raw.get("nearby_text") or "")
-    sequence = re.search(
-        r"(?:↓\s*)?(\d{1,3})\s*%[^₹\d]{0,8}(\d[\d,]*)[^₹]{0,20}₹\s*(\d[\d,]*)",
-        raw_text,
+    raw_text = " ".join(
+        str(part)
+        for part in (raw.get("text"), raw.get("nearby_text"))
+        if part not in (None, "")
     )
+    sequence = PRICE_SEQUENCE_RE.search(raw_text)
     if sequence:
         candidate_old = format_price(sequence.group(2))
         candidate_new = format_price(sequence.group(3))
@@ -78,6 +127,9 @@ def clean_price_block(raw: dict[str, Any] | None) -> dict[str, Any]:
             old_price = candidate_old
         if not new_price:
             new_price = candidate_new
+
+    if not old_price:
+        old_price = infer_old_price_from_price_text(raw_text, new_price, discount)
 
     valid = bool(new_price)
     old_value = parse_price_value(old_price)

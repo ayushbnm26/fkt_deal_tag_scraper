@@ -524,6 +524,14 @@ def fallback_candidate_from_price_block(price_block: dict[str, Any]) -> dict[str
     return None
 
 
+def _is_complete_price_block(price_block: dict[str, Any]) -> bool:
+    return bool(
+        price_block.get("discount_percentage")
+        and price_block.get("old_price")
+        and price_block.get("new_price")
+    )
+
+
 async def extract_deal_badge(page: Page) -> dict[str, Any]:
     price_block = await extract_primary_price_block(page)
     if not price_block.get("found"):
@@ -536,6 +544,7 @@ async def extract_deal_badge(page: Page) -> dict[str, Any]:
             "accepted_candidate": None,
         }
 
+    price_block = clean_price_block(price_block)
     raw = await collect_deal_candidates(page, price_block)
     raw_candidates = raw.get("candidates", []) if raw else []
     accepted, decisions, uncertain = evaluate_candidates(raw_candidates, price_block)
@@ -544,9 +553,7 @@ async def extract_deal_badge(page: Page) -> dict[str, Any]:
         accepted = fallback_candidate_from_price_block(price_block)
         if accepted:
             decisions.append(accepted)
-            price_complete = bool(
-                price_block.get("discount_percentage") and price_block.get("old_price") and price_block.get("new_price")
-            )
+            price_complete = _is_complete_price_block(price_block)
             return {
                 "status": STATUS_FOUND if price_complete else STATUS_PARTIAL,
                 "reason": "deal badge accepted from primary price block text"
@@ -574,9 +581,7 @@ async def extract_deal_badge(page: Page) -> dict[str, Any]:
             "raw_candidate_count": len(raw_candidates),
         }
 
-    price_complete = bool(
-        price_block.get("discount_percentage") and price_block.get("old_price") and price_block.get("new_price")
-    )
+    price_complete = _is_complete_price_block(price_block)
     return {
         "status": STATUS_FOUND if price_complete else STATUS_PARTIAL,
         "reason": "deal badge accepted"
@@ -591,10 +596,21 @@ async def extract_deal_badge(page: Page) -> dict[str, Any]:
 
 
 def extraction_to_result(fsn: str, extraction: dict[str, Any], debug_path: str = "") -> ScrapeResult:
-    price_block = extraction.get("price_block") or {}
+    price_block = clean_price_block(extraction.get("price_block") or {})
     status = extraction.get("status") or STATUS_NO_TAG
+    reason = extraction.get("reason", "")
     deal_tag = normalize_text(extraction.get("deal_tag") or "")
     found = bool(deal_tag and status in {STATUS_FOUND, STATUS_PARTIAL})
+    if found and status == STATUS_PARTIAL and _is_complete_price_block(price_block):
+        status = STATUS_FOUND
+        reason = (
+            "deal badge accepted from primary price block text"
+            if "primary price block text" in reason
+            else "deal badge accepted"
+        )
+    extraction["price_block"] = price_block
+    extraction["status"] = status
+    extraction["reason"] = reason
     return ScrapeResult(
         fsn=fsn,
         url=build_url(fsn),
@@ -604,7 +620,7 @@ def extraction_to_result(fsn: str, extraction: dict[str, Any], debug_path: str =
         old_price=price_block.get("old_price", "") if found else "",
         new_price=price_block.get("new_price", "") if found else "",
         status=status,
-        reason=extraction.get("reason", ""),
+        reason=reason,
         scraped_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         debug_path=debug_path,
     )
