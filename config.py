@@ -6,7 +6,7 @@ from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parent
 
-SCRIPT_VERSION = "2026.07.04-production-v3"
+SCRIPT_VERSION = "2026.07.04-production-v4"
 BASE_URL = "https://www.flipkart.com/product/p/itme?pid={fsn}"
 DEFAULT_FSN_COLUMN = "FSN"
 

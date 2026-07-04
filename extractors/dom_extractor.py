@@ -90,10 +90,10 @@ PRIMARY_PRICE_BLOCK_JS = r"""
 
   const isBadPriceContext = (el) => {
     const context = localContext(el, 5);
-    if (/\b(?:similar products|sponsored|customers also|recommend|reviews|ratings|combo)\b/i.test(context)) {
+    if (/\b(?:similar products|sponsored|ad|advertisement|customers also|recommend|reviews|ratings|combo|view similar)\b/i.test(context)) {
       return true;
     }
-    if (/\b(?:buy at|apply offers?|maximum savings|add to cart|delivery details|bank offer|coupon)\b/i.test(context)) {
+    if (/\b(?:buy at|apply offers?|maximum savings|add to cart|delivery details|bank offer|coupon|notify me)\b/i.test(context)) {
       return true;
     }
     return false;
@@ -467,6 +467,25 @@ def _has_price_context(text: str, phrase: str) -> bool:
     return bool(re.search(r"₹\s*[\d,]+|\b\d{1,3}\s*%", window))
 
 
+def _is_unsafe_nearby_fallback(source: str, text: str, phrase: str) -> bool:
+    if source != "primary_price_nearby_text":
+        return False
+
+    lowered_phrase = phrase.lower()
+    if lowered_phrase in {"lowest price", "lowest price since launch"}:
+        return True
+
+    index = text.lower().find(lowered_phrase)
+    window = text[max(0, index - 600) : index + len(phrase) + 220].lower() if index >= 0 else text.lower()
+    return bool(
+        re.search(
+            r"\b(?:similar products|sponsored|advertisement|view similar|notify me)\b|\bad\b",
+            window,
+            re.IGNORECASE,
+        )
+    )
+
+
 def fallback_candidate_from_price_block(price_block: dict[str, Any]) -> dict[str, Any] | None:
     if not isinstance(price_block, dict) or not price_block.get("found"):
         return None
@@ -480,6 +499,8 @@ def fallback_candidate_from_price_block(price_block: dict[str, Any]) -> dict[str
     for source, text in sources:
         phrase = extract_promotional_badge_phrase(text)
         if not phrase or not _has_price_context(text, phrase):
+            continue
+        if _is_unsafe_nearby_fallback(source, text, phrase):
             continue
 
         classification = classify_candidate_text(phrase)

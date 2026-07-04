@@ -104,6 +104,7 @@ OFFER_NOISE_PATTERNS = [
     re.compile(r"\bcashback\b", re.IGNORECASE),
     re.compile(r"\bapply\s+offers?\b", re.IGNORECASE),
     re.compile(r"\bmaximum\s+savings?\b", re.IGNORECASE),
+    re.compile(r"\blowest\s+price\s+for\s+you\b", re.IGNORECASE),
 ]
 
 BAD_CONTEXT_PATTERNS = [
@@ -140,6 +141,7 @@ PROMOTIONAL_PATTERNS = [
 PROMOTIONAL_BADGE_PHRASES = [
     (re.compile(r"\bearly\s+bird\s+deals?\b", re.IGNORECASE), "Early Bird Deal"),
     (re.compile(r"\blowest\s+price\s+in\s+the\s+year\b", re.IGNORECASE), "Lowest Price in the Year"),
+    (re.compile(r"\blowest\s+price\s+since\s+launch\b", re.IGNORECASE), "Lowest Price since Launch"),
     (re.compile(r"\blimited\s+time\s+deals?\b", re.IGNORECASE), "Limited Time Deal"),
     (re.compile(r"\bdeal\s+of\s+the\s+day\b", re.IGNORECASE), "Deal of the Day"),
     (re.compile(r"\btop\s+discount\s+of\s+the\s+sale\b", re.IGNORECASE), "Top Discount of the Sale"),
@@ -147,7 +149,7 @@ PROMOTIONAL_BADGE_PHRASES = [
     (re.compile(r"\bblack\s+deals?\b", re.IGNORECASE), "Black Deal"),
     (re.compile(r"\bspecial\s+deals?\b", re.IGNORECASE), "Special Deal"),
     (re.compile(r"\blimited\s+deals?\b", re.IGNORECASE), "Limited Deal"),
-    (re.compile(r"\blowest\s+price\b", re.IGNORECASE), "Lowest Price"),
+    (re.compile(r"\blowest\s+price(?!\s+for\s+you)\b", re.IGNORECASE), "Lowest Price"),
     (re.compile(r"\bprice\s+drop\b", re.IGNORECASE), "Price Drop"),
     (re.compile(r"\bsuper\s+saver\b", re.IGNORECASE), "Super Saver"),
     (re.compile(r"\bbig\s+sav(?:ing|er|ings)\b", re.IGNORECASE), "Big Saving"),

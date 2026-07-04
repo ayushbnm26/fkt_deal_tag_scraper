@@ -31,6 +31,7 @@ REJECTED_TEXTS = [
     "Free delivery",
     "Ratings",
     "Reviews",
+    "Lowest price for you",
 ]
 
 ACCEPTED_BADGE_TEXTS = [
@@ -42,6 +43,7 @@ ACCEPTED_BADGE_TEXTS = [
     "Special Deal",
     "Limited Time Deal",
     "Lowest Price",
+    "Lowest Price since Launch",
     "Top Discount of the Sale",
 ]
 
@@ -86,6 +88,8 @@ def test_promotional_text_accepts_known_real_badges(text: str) -> None:
 def test_extract_promotional_badge_phrase_from_price_line() -> None:
     assert extract_promotional_badge_phrase("Hot Deal 57% 390 ₹166") == "Hot Deal"
     assert extract_promotional_badge_phrase("Lowest Price in the Year 61% ₹451") == "Lowest Price in the Year"
+    assert extract_promotional_badge_phrase("Lowest Price since Launch 61% ₹451") == "Lowest Price since Launch"
+    assert extract_promotional_badge_phrase("Lowest price for you ₹4,608") == ""
     assert extract_promotional_badge_phrase("Top Discount of the Sale 71% 5,000 ₹1,427") == "Top Discount of the Sale"
     assert extract_promotional_badge_phrase("Bank Offer 10% instant discount") == ""
 
@@ -243,6 +247,67 @@ def test_price_block_fallback_rejects_plain_discount_without_badge_phrase() -> N
         }
     )
     assert candidate is None
+
+
+def test_price_block_fallback_rejects_wow_lowest_price_for_you_offer() -> None:
+    candidate = fallback_candidate_from_price_block(
+        {
+            "found": True,
+            "text": "15% 5,999 ₹5,121",
+            "nearby_text": "15% 5,999 ₹5,121 Buy at ₹4,608 Lowest price for you Apply offers for maximum savings",
+            "new_price": "5,121",
+            "old_price": "5,999",
+            "discount_percentage": "15%",
+        }
+    )
+    assert candidate is None
+
+
+def test_price_block_fallback_still_accepts_real_lowest_price_badge_phrase() -> None:
+    candidate = fallback_candidate_from_price_block(
+        {
+            "found": True,
+            "text": "Lowest Price 15% 5,999 ₹5,121",
+            "nearby_text": "Lowest Price 15% 5,999 ₹5,121",
+            "new_price": "5,121",
+            "old_price": "5,999",
+            "discount_percentage": "15%",
+        }
+    )
+    assert candidate is not None
+    assert candidate["text"] == "Lowest Price"
+
+
+def test_price_block_fallback_rejects_lowest_price_from_similar_products() -> None:
+    candidate = fallback_candidate_from_price_block(
+        {
+            "found": True,
+            "text": "1% 4,999 ₹4,949",
+            "nearby_text": (
+                "1% 4,999 ₹4,949 Buy at ₹4,701 Apply offers for maximum savings "
+                "Similar Products Nima Small Grinder 85% OFF ₹2,899 ₹442 Lowest Price since Launch Get it by 10 Jul"
+            ),
+            "new_price": "4,949",
+            "old_price": "4,999",
+            "discount_percentage": "1%",
+        }
+    )
+    assert candidate is None
+
+
+def test_price_block_fallback_still_accepts_top_discount_badge_phrase() -> None:
+    candidate = fallback_candidate_from_price_block(
+        {
+            "found": True,
+            "text": "Top Discount of the Sale 71% 5,000 ₹1,427",
+            "nearby_text": "Top Discount of the Sale 71% 5,000 ₹1,427 Buy at ₹1,151",
+            "new_price": "1,427",
+            "old_price": "5,000",
+            "discount_percentage": "71%",
+        }
+    )
+    assert candidate is not None
+    assert candidate["text"] == "Top Discount of the Sale"
 
 
 def test_visual_context_accepts_live_flipkart_white_text_child_pattern() -> None:

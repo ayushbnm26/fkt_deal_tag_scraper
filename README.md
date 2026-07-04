@@ -82,6 +82,7 @@ Apply Coupon
 Free delivery
 Ratings
 Reviews
+Lowest price for you
 ```
 
 When uncertain, the scraper leaves `Deal_Tag` blank and records `UNCERTAIN` or `NO_TAG` with a reason.
