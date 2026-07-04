@@ -1,0 +1,16 @@
+__pycache__/
+.pytest_cache/
+*.py[cod]
+
+debug_artifacts/
+debug_artifacts*/
+debug_html/
+debug_screenshots/
+
+*.xlsx
+!tests/fixtures/*.xlsx
+_*.xlsx
+
+.env
+.venv/
+venv/
